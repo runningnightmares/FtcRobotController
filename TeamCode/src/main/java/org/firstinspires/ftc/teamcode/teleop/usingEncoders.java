@@ -29,34 +29,31 @@
 
 package org.firstinspires.ftc.teamcode.teleop;
 
-import com.qualcomm.hardware.bosch.BNO055IMU;
-import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.IMU;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
 /**
- * This particular OpMode executes a POV Game style Teleop for a direct drive robot
- * The code is structured as a LinearOpMode
+ * This file contains an minimal example of a Linear "OpMode". An OpMode is a 'program' that runs in either
+ * the autonomous or the teleop period of an FTC match. The names of OpModes appear on the menu
+ * of the FTC Driver Station. When a selection is made from the menu, the corresponding OpMode
+ * class is instantiated on the Robot Controller and executed.
  *
- * In this mode the left stick moves the robot FWD and back, the Right stick turns left and right.
- * It raises and lowers the arm using the Gamepad Y and A buttons respectively.
- * It also opens and closes the claws slowly using the left and right Bumper buttons.
+ * This particular OpMode just executes a basic Tank Drive Teleop for a two wheeled robot
+ * It includes all the skeletal structure that all linear OpModes contain.
  *
  * Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
 
-@TeleOp(name="Mecanum Drive", group="Linear Opmode")
-//@Disabled
-public class mecanumTeleop extends LinearOpMode {
+public class usingEncoders extends LinearOpMode {
 
+    // Declare OpMode members.
     private ElapsedTime runtime = new ElapsedTime();
     private DcMotor liftArm;
     private double liftArmPower = 0.5; //lift arm power
@@ -71,8 +68,6 @@ public class mecanumTeleop extends LinearOpMode {
     private int currentLiftPosVal;
 
     private double rightJoy_y;
-
-    mecanumDriveHardware robot = new mecanumDriveHardware();
 
     public void initHardware(){
         elevatorMotorInit();
@@ -124,9 +119,9 @@ public class mecanumTeleop extends LinearOpMode {
 
 
         /*
-         * elevator positions and controls
-         *
-         * */
+        * elevator positions and controls
+        *
+        * */
         rightJoy_y = -gamepad1.right_stick_y;
 
         if(gamepad1.dpad_right){
@@ -145,7 +140,7 @@ public class mecanumTeleop extends LinearOpMode {
             liftPosValue = currentLiftPosVal;
         }
         if(gamepad1.dpad_up){
-            runLiftArmToPosition(liftArmPosFour);
+             runLiftArmToPosition(liftArmPosFour);
             currentLiftPosVal = liftArm.getTargetPosition();
             liftPosValue = currentLiftPosVal;
         }
@@ -168,38 +163,18 @@ public class mecanumTeleop extends LinearOpMode {
 
 
     }
-
-
-
     @Override
-    public void runOpMode() {
-        double leftjoy_x1;
-        double leftjoy_y1;
-        double rightjoy_x1;
-
-        initHardware();
-        runtime.reset();
-        // Define and Initialize Motors
-        robot.init(hardwareMap);
-
-        // Send telemetry message to signify robot waiting;
-        telemetry.addData(">", "Robot Ready.  Press Play.");    //
+    public void runOpMode() throws InterruptedException{
+        telemetry.addData("Status", "Initialized");
         telemetry.update();
-
-        // Retrieve the IMU from the hardware map
-        IMU imu = hardwareMap.get(IMU.class, "imu");
-        // Adjust the orientation parameters to match your robot
-        IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
-        // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
-        imu.initialize(parameters);
-
+        initHardware();
 
         // Wait for the game to start (driver presses PLAY)
         waitForStart();
+        runtime.reset();
 
-        if (isStopRequested()) return;
+
+
 
         // run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
@@ -207,59 +182,9 @@ public class mecanumTeleop extends LinearOpMode {
             teleopControls();
             motorTelemetry();
 
-            //mecanum Drivetrain code
-            // Run wheels in POV mode (note: The joystick goes negative when pushed forward, so negate it)
-            // In this mode the Left stick moves the robot fwd and back, the Right stick turns left and right.
-            // This way it's also easy to just drive straight, or just turn.
-
-            leftjoy_x1  =  gamepad1.left_stick_x * 1.1; //1.1 use to counteract imperfect strafing
-            leftjoy_y1 = -gamepad1.left_stick_y; //y stick value is reversed
-            rightjoy_x1  =  gamepad1.right_stick_x;
-
-            // This button choice was made so that it is hard to hit on accident, reset robot field position
-            // reset orientation
-            if (gamepad1.back) {
-                imu.resetYaw();
-            }
-
-            double botOrientation = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-
-            // Rotate the movement direction counter to the bot's rotation
-            double rotateX = leftjoy_x1 * Math.cos(-botOrientation) - leftjoy_y1 * Math.sin(-botOrientation);
-            double rotateY = leftjoy_x1 * Math.sin(-botOrientation) + leftjoy_y1 * Math.cos(-botOrientation);
-
-            rotateX = rotateX * 1.1;  // Counteract imperfect strafing
-            // Denominator is the largest motor power (absolute value) or 1
-            // This ensures all the powers maintain the same ratio,
-            // but only if at least one is out of the range [-1, 1]
-            double denominator = Math.max(Math.abs(leftjoy_y1) + Math.abs(leftjoy_x1) + Math.abs(rightjoy_x1), 1);
-            double frontLeftPower = (rotateY + rotateX + rightjoy_x1) / denominator;
-            double backLeftPower = (rotateY - rotateX + rightjoy_x1) / denominator;
-            double frontRightPower = (rotateY - rotateX - rightjoy_x1) / denominator;
-            double backRightPower = (rotateY + rotateX - rightjoy_x1) / denominator;
-
-
-            //Set motor power
-            robot.frontLeftDrive.setPower(frontLeftPower / 2);
-            robot.backRightDrive.setPower(backRightPower / 2);
-            //strafe left and right
-            robot.frontRightDrive.setPower(frontRightPower / 2);
-            robot.backLeftDrive.setPower(backLeftPower / 2);
-
-
-            // Send telemetry message to signify robot running;
-            telemetry.addData("left x1",  "%.2f", leftjoy_x1);
-            telemetry.addData("left y1", "%.2f", leftjoy_y1);
-            telemetry.addData("right x1",  "%.2f", rightjoy_x1);
-            telemetry.update();
-
-            // Pace this loop so jaw action is reasonable speed.
-            sleep(50);
 
 
         }
-
-
 
 
     }
