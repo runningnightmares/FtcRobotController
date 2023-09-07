@@ -36,7 +36,6 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 /**
  * This file works in conjunction with the External Hardware Class sample called: ConceptExternalHardwareClass.java
  * Please read the explanations in that Sample about how to use this class definition.
- *
  * This file defines a Java Class that performs all the setup and configuration for a sample robot's hardware (motors and sensors).
  */
 

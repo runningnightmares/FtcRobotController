@@ -31,11 +31,10 @@ package org.firstinspires.ftc.teamcode.teleop;
 
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.util.ElapsedTime;
-import com.qualcomm.robotcore.util.Range;
+
 
 
 /**
@@ -43,10 +42,8 @@ import com.qualcomm.robotcore.util.Range;
  * the autonomous or the teleop period of an FTC match. The names of OpModes appear on the menu
  * of the FTC Driver Station. When a selection is made from the menu, the corresponding OpMode
  * class is instantiated on the Robot Controller and executed.
- *
  * This particular OpMode just executes a basic Tank Drive Teleop for a two wheeled robot
  * It includes all the skeletal structure that all linear OpModes contain.
- *
  * Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
@@ -54,20 +51,9 @@ import com.qualcomm.robotcore.util.Range;
 public class usingEncoders extends LinearOpMode {
 
     // Declare OpMode members.
-    private ElapsedTime runtime = new ElapsedTime();
+    private final ElapsedTime runtime = new ElapsedTime();
     private DcMotor liftArm;
-    private double liftArmPower = 0.5; //lift arm power
-    private double liftArmZeroPower = 0.0;
-
-    private double liftArmSensativity = 0.5;
-    private int liftArmPosOne = 0;//ground position
-    private int liftArmPosTwo = 500;//low position
-    private int liftArmPosThree = 1000; //mid position
-    private int liftArmPosFour = 1500; //high position
-    private int liftPosValue;
-    private int currentLiftPosVal;
-
-    private double rightJoy_y;
+    private final double liftArmPower = 0.5; //lift arm power
 
     public void initHardware(){
         elevatorMotorInit();
@@ -102,6 +88,7 @@ public class usingEncoders extends LinearOpMode {
 
     public  void resetEncoder(){
         //stop motor
+        double liftArmZeroPower = 0.0;
         liftArm.setPower(liftArmZeroPower);
         //stop and reset the encoder
         liftArm.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -111,7 +98,7 @@ public class usingEncoders extends LinearOpMode {
     }
     public void motorTelemetry() {
         // Show the elapsed game time and wheel power.
-        telemetry.addData("Status", "Run Time: " + runtime.toString());
+        telemetry.addData("Status", "Run Time: " + runtime);
         telemetry.addData("Lift Position", " Encoder: %2d, Power %2f", liftArm.getCurrentPosition(), liftArm.getPower());
         telemetry.update();
     }
@@ -122,30 +109,40 @@ public class usingEncoders extends LinearOpMode {
         * elevator positions and controls
         *
         * */
-        rightJoy_y = -gamepad1.right_stick_y;
+        double rightJoy_y = -gamepad1.right_stick_y;
 
+        int liftPosValue;
+        int currentLiftPosVal;
         if(gamepad1.dpad_right){
+            //ground position
+            int liftArmPosOne = 0;
             runLiftArmToPosition(liftArmPosOne);
             currentLiftPosVal = liftArm.getTargetPosition();
             liftPosValue = currentLiftPosVal;
         }
         if (gamepad1.dpad_down){
+            //low position
+            int liftArmPosTwo = 500;
             runLiftArmToPosition(liftArmPosTwo);
             currentLiftPosVal = liftArm.getTargetPosition();
             liftPosValue = currentLiftPosVal;
         }
         if(gamepad1.dpad_left){
+            //mid position
+            int liftArmPosThree = 1000;
             runLiftArmToPosition(liftArmPosThree);
             currentLiftPosVal = liftArm.getTargetPosition();
             liftPosValue = currentLiftPosVal;
         }
         if(gamepad1.dpad_up){
-             runLiftArmToPosition(liftArmPosFour);
+            //high position
+            int liftArmPosFour = 1500;
+            runLiftArmToPosition(liftArmPosFour);
             currentLiftPosVal = liftArm.getTargetPosition();
             liftPosValue = currentLiftPosVal;
         }
 
-        if((gamepad1.left_bumper) == true &(gamepad1.right_bumper)== true){
+        if((gamepad1.left_bumper) & (gamepad1.right_bumper)){
 
             telemetry.addData("Lift Encoder Reset", "True");
             telemetry.update();
@@ -164,7 +161,7 @@ public class usingEncoders extends LinearOpMode {
 
     }
     @Override
-    public void runOpMode() throws InterruptedException{
+    public void runOpMode(){
         telemetry.addData("Status", "Initialized");
         telemetry.update();
         initHardware();
