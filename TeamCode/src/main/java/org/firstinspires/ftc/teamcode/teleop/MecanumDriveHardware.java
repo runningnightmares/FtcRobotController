@@ -29,7 +29,6 @@
 
 package org.firstinspires.ftc.teamcode.teleop;
 
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -39,7 +38,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
  * This file defines a Java Class that performs all the setup and configuration for a sample robot's hardware (motors and sensors).
  */
 
-public class mecanumDriveHardware {
+public class MecanumDriveHardware {
 
 
     // Define Motor and Servo objects  (Make them private so they can't be accessed externally)
@@ -56,7 +55,6 @@ public class mecanumDriveHardware {
     /**
      * Initialize all the robot's hardware.
      * This method must be called ONCE when the OpMode is initialized.
-     *
      * All of the hardware devices are accessed via the hardware map, and initialized.
      */
     public void init(HardwareMap ahwMap) {
