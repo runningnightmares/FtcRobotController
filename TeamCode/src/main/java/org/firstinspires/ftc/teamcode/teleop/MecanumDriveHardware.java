@@ -46,10 +46,7 @@ public class MecanumDriveHardware {
     public DcMotor frontRightDrive  = null;
     public DcMotor backLeftDrive  = null;
     public DcMotor backRightDrive  = null;
-
-    HardwareMap hwMap = null;
-
-
+    public HardwareMap hwMap = null;
 
 
     /**

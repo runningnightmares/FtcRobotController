@@ -35,6 +35,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -71,10 +72,28 @@ public class MecanumTeleop extends LinearOpMode {
     private double rightJoyStickXAxis;
     private double rightJoyStickYAxis;
 
+    private Servo leftClawServo;
+    private double LEFT_CLAW_INIT_POSITON = 0.5;
+    private double LEFT_CLAW_POSTION_ONE = 0;
+    private double LEFT_CLAW_POSITION_TWO = 1;
+    private double LEFT_CLAW_DELAY = 10;
+
+    IMU imu;
+
     MecanumDriveHardware robot = new MecanumDriveHardware();
 
     public void initHardware(){
         elevatorMotorInit();
+        leftClawServoInit();
+        imuInit();
+    }
+
+    public void leftClawServoInit(){
+        leftClawServo = hardwareMap.get(Servo.class, "leftClawServo");
+        leftClawServo.setDirection(Servo.Direction.FORWARD);
+        leftClawServo.setPosition(LEFT_CLAW_INIT_POSITON);
+        telemetry.addData("Left Claw Position" , leftClawServo.getPosition());
+
     }
 
     public void elevatorMotorInit(){
@@ -99,7 +118,7 @@ public class MecanumTeleop extends LinearOpMode {
         elevatorArm.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         elevatorArm.setPower(ELEVATOR_ARM_POWER);
         while (elevatorArm.isBusy()){
-            motorTelemetry();
+            sleep(5);
         }
         //liftArm.setPower(liftArmZeroPower);
     }
@@ -117,7 +136,6 @@ public class MecanumTeleop extends LinearOpMode {
         // Show the elapsed game time and wheel power.
         telemetry.addData("Status", "Run Time: " + runTime.toString());
         telemetry.addData("Lift Position", " Encoder: %2d, Power %2f", elevatorArm.getCurrentPosition(), elevatorArm.getPower());
-        telemetry.update();
     }
 
     public void getCurrentElevatorPosition(){
@@ -166,7 +184,54 @@ public class MecanumTeleop extends LinearOpMode {
 
     }
 
+public void imuInit(){
+// Retrieve the IMU from the hardware map
+    imu = hardwareMap.get(IMU.class, "imu");
+    // Adjust the orientation parameters to match your robot
+    IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
+            RevHubOrientationOnRobot.LogoFacingDirection.FORWARD,
+            RevHubOrientationOnRobot.UsbFacingDirection.RIGHT));
+    // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
+    imu.initialize(parameters);
+}
+public void mecanumDrive(){
+    //mecanum Drivetrain code
+    // Run wheels in POV mode (note: The joystick goes negative when pushed forward, so negate it)
+    // In this mode the Left stick moves the robot fwd and back, the Right stick turns left and right.
+    // This way it's also easy to just drive straight, or just turn.
 
+    leftJoyStickXAxis  =  gamepad1.left_stick_x * 1.1; //1.1 use to counteract imperfect strafing
+    leftJoyStickYAxis = -gamepad1.left_stick_y; //y stick value is reversed
+    rightJoyStickXAxis  =  gamepad1.right_stick_x;
+
+    // This button choice was made so that it is hard to hit on accident, reset robot field position
+    // reset orientation
+    if (gamepad1.back) {
+        imu.resetYaw();
+    }
+
+    double botOrientation = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+
+    // Rotate the movement direction counter to the bot's rotation
+    double rotateX = leftJoyStickXAxis * Math.cos(-botOrientation) - leftJoyStickYAxis * Math.sin(-botOrientation);
+    double rotateY = leftJoyStickXAxis * Math.sin(-botOrientation) + leftJoyStickYAxis * Math.cos(-botOrientation);
+
+    rotateX = rotateX * 1.1;  // Counteract imperfect strafing
+    // Denominator is the largest motor power (absolute value) or 1
+    // This ensures all the powers maintain the same ratio,
+    // but only if at least one is out of the range [-1, 1]
+    double denominator = Math.max(Math.abs(leftJoyStickYAxis) + Math.abs(leftJoyStickXAxis) + Math.abs(rightJoyStickXAxis), 1);
+    double frontLeftMotorPower = (rotateY + rotateX + rightJoyStickXAxis) / denominator;
+    double backLeftMotorPower = (rotateY - rotateX + rightJoyStickXAxis) / denominator;
+    double frontRightMotorPower = (rotateY - rotateX - rightJoyStickXAxis) / denominator;
+    double backRightMotorPower = (rotateY + rotateX - rightJoyStickXAxis) / denominator;
+
+    //Set motor power
+    robot.frontLeftDrive.setPower(frontLeftMotorPower / 2);
+    robot.backRightDrive.setPower(backRightMotorPower / 2);
+    robot.frontRightDrive.setPower(frontRightMotorPower / 2);
+    robot.backLeftDrive.setPower(backLeftMotorPower / 2);
+}
 
     @Override
     public void runOpMode() {
@@ -180,14 +245,7 @@ public class MecanumTeleop extends LinearOpMode {
         telemetry.addData(">", "Robot Ready.  Press Play.");    //
         telemetry.update();
 
-        // Retrieve the IMU from the hardware map
-        IMU imu = hardwareMap.get(IMU.class, "imu");
-        // Adjust the orientation parameters to match your robot
-        IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
-        // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
-        imu.initialize(parameters);
+
 
 
         // Wait for the game to start (driver presses PLAY)
@@ -199,47 +257,7 @@ public class MecanumTeleop extends LinearOpMode {
         while (opModeIsActive()) {
 
             teleopControls();
-
-
-            //mecanum Drivetrain code
-            // Run wheels in POV mode (note: The joystick goes negative when pushed forward, so negate it)
-            // In this mode the Left stick moves the robot fwd and back, the Right stick turns left and right.
-            // This way it's also easy to just drive straight, or just turn.
-
-            leftJoyStickXAxis  =  gamepad1.left_stick_x * 1.1; //1.1 use to counteract imperfect strafing
-            leftJoyStickYAxis = -gamepad1.left_stick_y; //y stick value is reversed
-            rightJoyStickXAxis  =  gamepad1.right_stick_x;
-
-            // This button choice was made so that it is hard to hit on accident, reset robot field position
-            // reset orientation
-            if (gamepad1.back) {
-                imu.resetYaw();
-            }
-
-            double botOrientation = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-
-            // Rotate the movement direction counter to the bot's rotation
-            double rotateX = leftJoyStickXAxis * Math.cos(-botOrientation) - leftJoyStickYAxis * Math.sin(-botOrientation);
-            double rotateY = leftJoyStickXAxis * Math.sin(-botOrientation) + leftJoyStickYAxis * Math.cos(-botOrientation);
-
-            rotateX = rotateX * 1.1;  // Counteract imperfect strafing
-            // Denominator is the largest motor power (absolute value) or 1
-            // This ensures all the powers maintain the same ratio,
-            // but only if at least one is out of the range [-1, 1]
-            double denominator = Math.max(Math.abs(leftJoyStickYAxis) + Math.abs(leftJoyStickXAxis) + Math.abs(rightJoyStickXAxis), 1);
-            double frontLeftMotorPower = (rotateY + rotateX + rightJoyStickXAxis) / denominator;
-            double backLeftMotorPower = (rotateY - rotateX + rightJoyStickXAxis) / denominator;
-            double frontRightMotorPower = (rotateY - rotateX - rightJoyStickXAxis) / denominator;
-            double backRightMotorPower = (rotateY + rotateX - rightJoyStickXAxis) / denominator;
-
-
-            //Set motor power
-            robot.frontLeftDrive.setPower(frontLeftMotorPower / 2);
-            robot.backRightDrive.setPower(backRightMotorPower / 2);
-            //strafe left and right
-            robot.frontRightDrive.setPower(frontRightMotorPower / 2);
-            robot.backLeftDrive.setPower(backLeftMotorPower / 2);
-
+            mecanumDrive();
             motorTelemetry();
             // Send telemetry message to signify robot running;
             telemetry.addData("left x1",  "%.2f", leftJoyStickXAxis);
