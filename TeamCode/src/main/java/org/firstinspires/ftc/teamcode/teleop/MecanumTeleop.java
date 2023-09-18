@@ -57,10 +57,11 @@ public class MecanumTeleop extends LinearOpMode {
     private final ElapsedTime runTime = new ElapsedTime();
     private DcMotor elevatorArm;
     private Servo leftClawServo;
+    private Servo rightClawServo;
     private IMU imu;
     private final MecanumDriveHardware robot = new MecanumDriveHardware();
     private final double DRIVETRAIN_POWER = 0.5;
-    private final double ELEVATOR_ARM_POWER = 0.5;
+    private final double ELEVATOR_ARM_POWER = 0.25;
     private final double ELEVATOR_ARM_ZERO_POWER = 0.0;
     private final int ELEVATOR_POSITION_ONE = 0;//ground position
     private final int ELEVATOR_POSITION_TWO = 500;//low position
@@ -69,14 +70,18 @@ public class MecanumTeleop extends LinearOpMode {
     private final int MAX_ELEVATOR_TRAVEL = 1550;
     private final int MIN_ELEVATOR_TRAVEL = -100;
     private final double ELEVATOR_ARM_JOYSTICK_SENSITIVITY = 0.5;
-    private final double LEFT_CLAW_INIT_POSITION = 0.5;
-    private final double LEFT_CLAW_POSITION_ONE = 0;
-    private final double LEFT_CLAW_POSITION_TWO = 1;
+    private final double LEFT_CLAW_INIT_POSITION = 0;
+    private final double RIGHT_CLAW_INIT_POSITION = 0;
+    private final double LEFT_CLAW_POSITION_ONE = 0.0;
+    private final double LEFT_CLAW_POSITION_TWO = 0.45;
+    private final double RIGHT_CLAW_POSITION_ONE = 0.0;
+    private final double RIGHT_CLAW_POSITION_TWO = 0.45;
     private final double ELEVATOR_ENCODER_TICKS_PER_INCH = 188.6634;
 
     public void initHardware(){
         elevatorMotorInit();
         leftClawServoInit();
+        rightClawServoInit();
         imuInit();
     }
     public void imuInit(){
@@ -132,6 +137,11 @@ public class MecanumTeleop extends LinearOpMode {
         leftClawServo.setDirection(Servo.Direction.FORWARD);
         leftClawServo.setPosition(LEFT_CLAW_INIT_POSITION);
     }
+    public void rightClawServoInit(){
+        rightClawServo = hardwareMap.get(Servo.class, "rightClawServo");
+        rightClawServo.setDirection(Servo.Direction.REVERSE);
+        rightClawServo.setPosition(RIGHT_CLAW_INIT_POSITION);
+    }
     public void elevatorMotorInit(){
         // Initialize the hardware variables. Note that the strings used here as parameters
         // to 'get' must correspond to the names assigned during the robot configuration
@@ -141,83 +151,6 @@ public class MecanumTeleop extends LinearOpMode {
         elevatorArm.setPower(ELEVATOR_ARM_POWER);
         elevatorArm.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); //brake use motor to stop float use coasting to stop
         elevatorArm.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-    }
-    public void runLiftArmToPosition(int position){
-        elevatorArm.setTargetPosition(position);
-        elevatorArm.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        elevatorArm.setPower(ELEVATOR_ARM_POWER);
-        while (elevatorArm.isBusy()){
-            sleep(5);
-        }
-    }
-    public  void resetElevatorArmEncoder(){
-        //stop motor
-        elevatorArm.setPower(ELEVATOR_ARM_ZERO_POWER);
-        //stop and reset the encoder
-        elevatorArm.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        //start the encoder
-        elevatorArm.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-    }
-    public void motorTelemetry(){
-        // Show the elapsed game time and wheel power.
-        telemetry.addData("Status", "Run Time: " + runTime);
-        telemetry.addData("Elevator Position: ", " Encoder: %2d, Power %2f", elevatorArm.getCurrentPosition(), elevatorArm.getPower());
-        telemetry.addData("Left Claw Position" , leftClawServo.getPosition());
-    }
-    public void teleopControls(){
-
-
-            // Joystick Control of Elevator Arm
-            double rightJoyStickYAxis = -gamepad1.right_stick_y * ELEVATOR_ARM_JOYSTICK_SENSITIVITY; //Y value reversed
-
-            // Calculate the new target position based on joystick input
-            int newTargetPosition = elevatorArm.getTargetPosition() + (int)(rightJoyStickYAxis * ELEVATOR_ENCODER_TICKS_PER_INCH);
-
-            // Apply limits to the target position to prevent exceeding 1550
-            newTargetPosition = Math.min(newTargetPosition, MAX_ELEVATOR_TRAVEL);
-            newTargetPosition = Math.max(newTargetPosition, MIN_ELEVATOR_TRAVEL);
-
-            // Update the elevator arm's target position
-            elevatorArm.setTargetPosition(newTargetPosition);
-
-            // Apply the joystick input to control the elevator arm
-            elevatorArm.setMode(DcMotor.RunMode.RUN_TO_POSITION); // Switch to RUN_TO_POSITION mode
-            elevatorArm.setPower(ELEVATOR_ARM_POWER);
-
-            telemetry.addData("Right Y Axis:", rightJoyStickYAxis);
-            telemetry.addData("Current Elevator Position", elevatorArm.getCurrentPosition());
-
-
-        if(gamepad1.dpad_right){
-            runLiftArmToPosition(ELEVATOR_POSITION_ONE);
-        }
-        if (gamepad1.dpad_down){
-            runLiftArmToPosition(ELEVATOR_POSITION_TWO);
-        }
-        if(gamepad1.dpad_left){
-            runLiftArmToPosition(ELEVATOR_POSITION_THREE);
-        }
-        if(gamepad1.dpad_up){
-            runLiftArmToPosition(ELEVATOR_POSITION_FOUR);
-        }
-        if((gamepad1.left_bumper) & (gamepad1.right_bumper)){
-            telemetry.addData("Elevator Encoder Reset", "True");
-            telemetry.update();
-            resetElevatorArmEncoder();
-        }
-        if (gamepad1.left_bumper){
-            leftClawServo.setPosition(LEFT_CLAW_POSITION_ONE);
-        }
-
-        if (gamepad1.right_bumper){
-            leftClawServo.setPosition(LEFT_CLAW_POSITION_TWO);
-        }
-
-        // This button choice was made so that it is hard to hit on accident, reset robot field position
-        // reset orientation
-        if (gamepad1.back){
-            imu.resetYaw();
-        }
     }
 
     @Override
@@ -245,8 +178,84 @@ public class MecanumTeleop extends LinearOpMode {
             telemetry.update();
         }
 
+    }
+    public void runLiftArmToPosition(int position){
+        elevatorArm.setTargetPosition(position);
+        elevatorArm.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        elevatorArm.setPower(ELEVATOR_ARM_POWER);
+        while (elevatorArm.isBusy()){
+            sleep(5);
+        }
+    }
+    public  void resetElevatorArmEncoder(){
+        //stop motor
+        elevatorArm.setPower(ELEVATOR_ARM_ZERO_POWER);
+        //stop and reset the encoder
+        elevatorArm.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        //start the encoder
+        elevatorArm.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
+    public void motorTelemetry(){
+        // Show the elapsed game time and wheel power.
+        telemetry.addData("Status", "Run Time: " + runTime);
+        telemetry.addData("Elevator Position: ", " Encoder: %2d, Power %2f", elevatorArm.getCurrentPosition(), elevatorArm.getPower());
+        telemetry.addData("Left Claw Position" , leftClawServo.getPosition());
+    }
+    public void teleopControls(){
 
 
+        // Joystick Control of Elevator Arm
+        double rightJoyStickYAxis = -gamepad1.right_stick_y * ELEVATOR_ARM_JOYSTICK_SENSITIVITY; //Y value reversed
 
+        // Calculate the new target position based on joystick input
+        int newTargetPosition = elevatorArm.getTargetPosition() + (int)(rightJoyStickYAxis * ELEVATOR_ENCODER_TICKS_PER_INCH);
+
+        // Apply limits to the target position to prevent exceeding 1550
+        newTargetPosition = Math.min(newTargetPosition, MAX_ELEVATOR_TRAVEL);
+        newTargetPosition = Math.max(newTargetPosition, MIN_ELEVATOR_TRAVEL);
+
+        // Update the elevator arm's target position
+        elevatorArm.setTargetPosition(newTargetPosition);
+
+        // Apply the joystick input to control the elevator arm
+        elevatorArm.setMode(DcMotor.RunMode.RUN_TO_POSITION); // Switch to RUN_TO_POSITION mode
+        elevatorArm.setPower(ELEVATOR_ARM_POWER);
+
+        telemetry.addData("Right Y Axis:", rightJoyStickYAxis);
+        telemetry.addData("Current Elevator Position", elevatorArm.getCurrentPosition());
+
+
+        if(gamepad1.dpad_right){
+            runLiftArmToPosition(ELEVATOR_POSITION_ONE);
+        }
+        if (gamepad1.dpad_down){
+            runLiftArmToPosition(ELEVATOR_POSITION_TWO);
+        }
+        if(gamepad1.dpad_left){
+            runLiftArmToPosition(ELEVATOR_POSITION_THREE);
+        }
+        if(gamepad1.dpad_up){
+            runLiftArmToPosition(ELEVATOR_POSITION_FOUR);
+        }
+        if((gamepad1.left_trigger == 1) & (gamepad1.right_trigger == 1)){
+            telemetry.addData("Elevator Encoder Reset", "True");
+            telemetry.update();
+            resetElevatorArmEncoder();
+        }
+        if (gamepad1.left_bumper){
+            leftClawServo.setPosition(LEFT_CLAW_POSITION_ONE);
+            rightClawServo.setPosition(RIGHT_CLAW_POSITION_ONE);
+        }
+
+        if (gamepad1.right_bumper){  //open claw position
+            leftClawServo.setPosition(LEFT_CLAW_POSITION_TWO);
+            rightClawServo.setPosition(RIGHT_CLAW_POSITION_TWO);
+        }
+
+        // This button choice was made so that it is hard to hit on accident, reset robot field position
+        // reset orientation
+        if (gamepad1.back){
+            imu.resetYaw();
+        }
     }
 }
