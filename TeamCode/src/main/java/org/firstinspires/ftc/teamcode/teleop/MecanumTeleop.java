@@ -61,21 +61,21 @@ public class MecanumTeleop extends LinearOpMode {
     private IMU imu;
     private final MecanumDriveHardware robot = new MecanumDriveHardware();
     private final double DRIVETRAIN_POWER = 0.5;
-    private final double ELEVATOR_ARM_POWER = 0.25;
+    private final double ELEVATOR_ARM_POWER = 0.55;
     private final double ELEVATOR_ARM_ZERO_POWER = 0.0;
     private final int ELEVATOR_POSITION_ONE = 0;//ground position
-    private final int ELEVATOR_POSITION_TWO = 500;//low position
-    private final int ELEVATOR_POSITION_THREE = 1000; //mid position
-    private final int ELEVATOR_POSITION_FOUR = 1300; //high position
-    private final int MAX_ELEVATOR_TRAVEL = 1550;
+    private final int ELEVATOR_POSITION_TWO = 760;//low position
+    private final int ELEVATOR_POSITION_THREE = 1260; //mid position
+    private final int ELEVATOR_POSITION_FOUR = 1570; //high position
+    private final int MAX_ELEVATOR_TRAVEL = 1600;
     private final int MIN_ELEVATOR_TRAVEL = -100;
-    private final double ELEVATOR_ARM_JOYSTICK_SENSITIVITY = 0.5;
+    private final double ELEVATOR_ARM_JOYSTICK_SENSITIVITY = 0.3;
     private final double LEFT_CLAW_INIT_POSITION = 0;
     private final double RIGHT_CLAW_INIT_POSITION = 0;
     private final double LEFT_CLAW_POSITION_ONE = 0.0;
-    private final double LEFT_CLAW_POSITION_TWO = 0.45;
+    private final double LEFT_CLAW_POSITION_TWO = 0.5;
     private final double RIGHT_CLAW_POSITION_ONE = 0.0;
-    private final double RIGHT_CLAW_POSITION_TWO = 0.45;
+    private final double RIGHT_CLAW_POSITION_TWO = 0.5;
     private final double ELEVATOR_ENCODER_TICKS_PER_INCH = 188.6634;
 
     public void initHardware(){
@@ -183,9 +183,6 @@ public class MecanumTeleop extends LinearOpMode {
         elevatorArm.setTargetPosition(position);
         elevatorArm.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         elevatorArm.setPower(ELEVATOR_ARM_POWER);
-        while (elevatorArm.isBusy()){
-            sleep(5);
-        }
     }
     public  void resetElevatorArmEncoder(){
         //stop motor
@@ -210,7 +207,7 @@ public class MecanumTeleop extends LinearOpMode {
         // Calculate the new target position based on joystick input
         int newTargetPosition = elevatorArm.getTargetPosition() + (int)(rightJoyStickYAxis * ELEVATOR_ENCODER_TICKS_PER_INCH);
 
-        // Apply limits to the target position to prevent exceeding 1550
+        // Apply limits to the target position to prevent exceeding 1600
         newTargetPosition = Math.min(newTargetPosition, MAX_ELEVATOR_TRAVEL);
         newTargetPosition = Math.max(newTargetPosition, MIN_ELEVATOR_TRAVEL);
 

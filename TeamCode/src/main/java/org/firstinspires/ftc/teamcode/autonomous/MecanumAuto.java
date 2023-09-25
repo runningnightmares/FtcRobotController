@@ -37,8 +37,14 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
-
+import com.qualcomm.hardware.bosch.BNO055IMU;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+import org.firstinspires.ftc.robotcore.external.navigation.Position;
+import org.firstinspires.ftc.robotcore.external.navigation.Velocity;
+import org.firstinspires.ftc.teamcode.R;
 import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
 
 /**
@@ -56,42 +62,66 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
 
         private final ElapsedTime runTime = new ElapsedTime();
         private DcMotor elevatorArm;
-        private Servo leftClawServo;
-        private IMU imu;
+        private BNO055IMU imu;
         private final MecanumDriveHardware robot = new MecanumDriveHardware();
-        private final int WHEEL_DIAMETER = 96;// gobilda mecanum wheel Diameter 96mm or 3.78"
-        private final double DRIVETRAIN_POWER = 0.5;
+    private Servo leftClawServo;
+    private Servo rightClawServo;
+        private final double WHEEL_DIAMETER = 3.78;// gobilda mecanum wheel Diameter 96mm or 3.78"
+    private final double COUNTS_PER_REV = 537.7; // Replace with your motor's encoder counts per revolution
+    private final double DRIVE_SPEED = 0.5; // Adjust to your desired speed
+    private final double DRIVETRAIN_POWER = 0.5;
         private final double DRIVETRAIN_TPI = 45.33;
     private final double DRIVETRAIN_ZERO_POWER = 0.0;
         private final double ELEVATOR_ARM_POWER = 0.5;
         private final double ELEVATOR_ARM_ZERO_POWER = 0.0;
-
-        private final double LEFT_CLAW_INIT_POSITION = 0.5;
-        private final double LEFT_CLAW_POSITION_ONE = 0;
-        private final double LEFT_CLAW_POSITION_TWO = 1;
+    private final double LEFT_CLAW_INIT_POSITION = 0;
+    private final double RIGHT_CLAW_INIT_POSITION = 0;
+    private final double LEFT_CLAW_POSITION_ONE = 0.0;
+    private final double LEFT_CLAW_POSITION_TWO = 0.45;
+    private final double RIGHT_CLAW_POSITION_ONE = 0.0;
+    private final double RIGHT_CLAW_POSITION_TWO = 0.45;
         private final double ELEVATOR_ENCODER_TICKS_PER_INCH = 188.72;
+        private final int targetEncoderTicks = 0;
 
-        public void initHardware(){
+    // Set a target heading (e.g., 0 degrees for straight forward)
+    double targetHeading = 0.0;
+
+    public void initHardware(){
             elevatorMotorInit();
             leftClawServoInit();
+            rightClawServoInit();
             imuInit();
         }
         public void imuInit(){
-            // Retrieve the IMU from the hardware map
-            imu = hardwareMap.get(IMU.class, "imu");
-            // Adjust the orientation parameters to match your robot
-            IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                    RevHubOrientationOnRobot.LogoFacingDirection.FORWARD,
-                    RevHubOrientationOnRobot.UsbFacingDirection.RIGHT));
-            // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
-            imu.initialize(parameters);
+
+        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+        parameters.mode                = BNO055IMU.SensorMode.IMU;
+        parameters.angleUnit           = BNO055IMU.AngleUnit.DEGREES;
+        parameters.accelUnit           = BNO055IMU.AccelUnit.METERS_PERSEC_PERSEC;
+        parameters.loggingEnabled      = false;
+
+        // Retrieve and initialize the IMU. We expect the IMU to be attached to an I2C port
+        // on a Core Device Interface Module, configured to be a sensor of type "AdaFruit IMU",
+        // and named "imu".
+        imu = hardwareMap.get(BNO055IMU.class, "imu");
+
+        imu.initialize(parameters);
+
+        telemetry.addData("Mode", "calibrating...");
+        telemetry.update();
+
         }
 
-        public void leftClawServoInit(){
-            leftClawServo = hardwareMap.get(Servo.class, "leftClawServo");
-            leftClawServo.setDirection(Servo.Direction.FORWARD);
-            leftClawServo.setPosition(LEFT_CLAW_INIT_POSITION);
-        }
+    public void leftClawServoInit(){
+        leftClawServo = hardwareMap.get(Servo.class, "leftClawServo");
+        leftClawServo.setDirection(Servo.Direction.FORWARD);
+        leftClawServo.setPosition(LEFT_CLAW_INIT_POSITION);
+    }
+    public void rightClawServoInit(){
+        rightClawServo = hardwareMap.get(Servo.class, "rightClawServo");
+        rightClawServo.setDirection(Servo.Direction.REVERSE);
+        rightClawServo.setPosition(RIGHT_CLAW_INIT_POSITION);
+    }
         public void elevatorMotorInit(){
             // Initialize the hardware variables. Note that the strings used here as parameters
             // to 'get' must correspond to the names assigned during the robot configuration
@@ -113,17 +143,26 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
             // Send telemetry message to signify robot waiting;
             telemetry.addData(">", "Robot Ready.  Press Play.");    //
             telemetry.update();
+        double initialPower = 0.1; // Start with a low power
+        double targetPower = 0.5; // Your desired power
+        double powerIncrement = 0.05; // Increment in power
 
             // Wait for the game to start (driver presses PLAY)
             waitForStart();
 
             if (isStopRequested()) return;
 
+        autonomousDriveStraight(.5,5,false);
+        rotate(0.3,-45);
+        autonomousDriveStraight(.5,5,true);
+        rotate(0.3,45);
             // run until the end of the match (driver presses STOP)
             while (opModeIsActive()) {
-                autonomousDriveForward(0.25,10);
-                motorTelemetry();
 
+                motorTelemetry();
+                telemetry.addData("Target Ticks", targetEncoderTicks);
+                telemetry.addData("Current Ticks", robot.frontLeftDrive.getCurrentPosition());
+                telemetry.update();
                 stopAllMotors();
             }
 
@@ -134,9 +173,6 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         elevatorArm.setTargetPosition(position);
         elevatorArm.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         elevatorArm.setPower(ELEVATOR_ARM_POWER);
-        while (elevatorArm.isBusy()){
-            sleep(5);
-        }
     }
     public  void resetElevatorArmEncoder(){
         //stop motor
@@ -161,20 +197,31 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         telemetry.addData("FR Motor:", robot.frontRightDrive.getCurrentPosition());
         telemetry.addData("BL Motor:", robot.backLeftDrive.getCurrentPosition());
         telemetry.addData("BR Motor:", robot.backRightDrive.getCurrentPosition());
-        telemetry.update();
+
     }
-    public void autonomousDriveForward(double power, int distanceInches) {
-        int targetEncoderTicks = (int) (distanceInches * DRIVETRAIN_TPI);
+    public void autonomousDriveStraight(double maxPower, int distanceInches, boolean reverse) {
+        int targetPosition;
+
+        if (reverse) {
+            targetPosition = (int) (-12.0 * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
+        } else {
+            targetPosition = (int) (12.0 * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
+        }
+
         // Reset encoder values and set target positions
         robot.frontLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         robot.frontRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         robot.backLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         robot.backRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
-        robot.frontLeftDrive.setTargetPosition(targetEncoderTicks);
-        robot.frontRightDrive.setTargetPosition(targetEncoderTicks);
-        robot.backLeftDrive.setTargetPosition(targetEncoderTicks);
-        robot.backRightDrive.setTargetPosition(targetEncoderTicks);
+        robot.frontLeftDrive.setTargetPosition(targetPosition);
+        robot.frontRightDrive.setTargetPosition(targetPosition);
+        robot.backLeftDrive.setTargetPosition(targetPosition);
+        robot.backRightDrive.setTargetPosition(targetPosition);
+        // Initialize power and run to position
+        double power = 0.1; // Initial power (start slow)
+        double accelerationRate = 0.02; // Rate of power increase per iteration
+
 
         // Set power and run to position
         robot.frontLeftDrive.setPower(power); // Adjust power as needed
@@ -187,21 +234,108 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         robot.backRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
+        double initialHeading = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
 
-        telemetry.addData("Status", "Moving Forward");
 
-        // Stop all motors
-        robot.frontLeftDrive.setPower(0);
-        robot.frontRightDrive.setPower(0);
-        robot.backLeftDrive.setPower(0);
-        robot.backRightDrive.setPower(0);
+        while (opModeIsActive() &&
+                robot.frontLeftDrive.isBusy() &&
+                robot.frontRightDrive.isBusy() &&
+                robot.backLeftDrive.isBusy() &&
+                robot.backRightDrive.isBusy()) {
+            // Gradually increase power for acceleration
+            if (power < maxPower) {
+                power += accelerationRate;
+            }
+            // You can add additional tasks here if needed
+            // Calculate the correction based on the current heading
+            double currentHeading = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
+            double correctionFrontLeft = (currentHeading - initialHeading) * 0.01; // Adjust the correction factor as needed
+            double correctionFrontRight = (currentHeading - initialHeading) * 0.01; // Adjust the correction factor as needed
+            double correctionBackLeft = (currentHeading - initialHeading) * 0.01; // Adjust the correction factor as needed
+            double correctionBackRight = (currentHeading - initialHeading) * 0.01; // Adjust the correction factor as needed
+
+            // Apply the correction to maintain a straight heading
+            robot.frontLeftDrive.setPower(power + correctionFrontLeft);
+            robot.frontRightDrive.setPower(power + correctionFrontRight);
+            robot.backLeftDrive.setPower(power + correctionBackLeft);
+            robot.backRightDrive.setPower(power + correctionBackRight);
+        }
+
+        // Gradually decrease power for deceleration
+        while (power > 0) {
+            power -= accelerationRate;
+            if (power < 0) {
+                power = 0;
+            }
+            robot.frontLeftDrive.setPower(power);
+            robot.frontRightDrive.setPower(power);
+            robot.backLeftDrive.setPower(power);
+            robot.backRightDrive.setPower(power);
+        }
+        // Stop the robot
+        robot.frontLeftDrive.setPower(0.0);
+        robot.frontRightDrive.setPower(0.0);
+        robot.backLeftDrive.setPower(0.0);
+        robot.backRightDrive.setPower(0.0);
+        // Set the motors back to RUN_USING_ENCODER mode for manual control
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
+    public void rotate(double maxPower, double targetAngle) {
+        // Ensure the target angle is within the range of -180 to 180 degrees
+        targetAngle = normalizeAngle(targetAngle);
+
+        // Set the motors to run using encoders
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        // Calculate the initial heading
+        double initialHeading = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
+
+        // Calculate the error (the difference between the target and current heading)
+        double error = targetAngle - initialHeading;
+
+        // Set the power sign based on the direction of rotation
+        int powerSign = (error > 0) ? -1 : 1;
+
+        // While the error is outside an acceptable threshold, continue rotating
+        while (opModeIsActive() && Math.abs(error) > 1.0) {
+            // Recalculate the error at each iteration
+            error = targetAngle - imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
+
+            // Adjust the power based on the error and maxPower
+            double power = powerSign * Math.min(maxPower, Math.abs(error / 30.0));
+
+            // Set the motor powers to rotate
+            robot.frontLeftDrive.setPower(-power);
+            robot.frontRightDrive.setPower(power);
+            robot.backLeftDrive.setPower(-power);
+            robot.backRightDrive.setPower(power);
+        }
+
+        // Stop the motors
+        stopAllMotors();
 
         // Set the motors back to RUN_USING_ENCODER mode for manual control
         robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
 
+    // Helper function to normalize angles to the range -180 to 180 degrees
+    private double normalizeAngle(double angle) {
+        while (angle > 180.0) {
+            angle -= 360.0;
+        }
+        while (angle <= -180.0) {
+            angle += 360.0;
+        }
+        return angle;
     }
 
 }
