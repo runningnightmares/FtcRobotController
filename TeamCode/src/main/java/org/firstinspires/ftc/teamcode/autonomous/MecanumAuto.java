@@ -151,18 +151,29 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
             waitForStart();
 
             if (isStopRequested()) return;
-
+            closeCLaw();
+            sleep(1000);
+        motorTelemetry();
         autonomousDriveStraight(.5,5,false);
-        rotate(0.3,-45);
-        autonomousDriveStraight(.5,5,true);
+        motorTelemetry();
         rotate(0.3,45);
+        autonomousDriveStraight(.5,5,true);
+        motorTelemetry();
+        rotate(0.3,-45);
+        motorTelemetry();
+        strafeRight(0.5,6);
+        motorTelemetry();
+        autonomousDriveStraight(0.5,5,false);
+        motorTelemetry();
+        strafeRight(0.5,5);
+        motorTelemetry();
+        strafeLeft(0.5 , 10);
+        motorTelemetry();
             // run until the end of the match (driver presses STOP)
             while (opModeIsActive()) {
 
-                motorTelemetry();
-                telemetry.addData("Target Ticks", targetEncoderTicks);
-                telemetry.addData("Current Ticks", robot.frontLeftDrive.getCurrentPosition());
-                telemetry.update();
+
+
                 stopAllMotors();
             }
 
@@ -191,21 +202,20 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         robot.backRightDrive.setPower(DRIVETRAIN_ZERO_POWER);
     }
     public void motorTelemetry(){
-        // Monitor telemetry and perform other tasks
-        telemetry.addData("Status", "Running Autonomous");
-        telemetry.addData("FL Motor:", robot.frontLeftDrive.getCurrentPosition());
-        telemetry.addData("FR Motor:", robot.frontRightDrive.getCurrentPosition());
-        telemetry.addData("BL Motor:", robot.backLeftDrive.getCurrentPosition());
-        telemetry.addData("BR Motor:", robot.backRightDrive.getCurrentPosition());
-
+        // Add telemetry for debugging
+        telemetry.addData("FL Position", robot.frontLeftDrive.getCurrentPosition());
+        telemetry.addData("FR Position", robot.frontRightDrive.getCurrentPosition());
+        telemetry.addData("BL Position", robot.backLeftDrive.getCurrentPosition());
+        telemetry.addData("BR Position", robot.backRightDrive.getCurrentPosition());
+        telemetry.update();
     }
     public void autonomousDriveStraight(double maxPower, int distanceInches, boolean reverse) {
         int targetPosition;
 
         if (reverse) {
-            targetPosition = (int) (-12.0 * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
+            targetPosition = (int) (-distanceInches * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
         } else {
-            targetPosition = (int) (12.0 * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
+            targetPosition = (int) (distanceInches * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
         }
 
         // Reset encoder values and set target positions
@@ -283,6 +293,133 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
+    public void strafeRight(double maxPower, int distanceInches) {
+        int targetPosition = (int) (distanceInches * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
+
+        // Reset encoder values and set target positions
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.backRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        robot.frontLeftDrive.setTargetPosition(targetPosition);
+        robot.frontRightDrive.setTargetPosition(-targetPosition);
+        robot.backLeftDrive.setTargetPosition(-targetPosition);
+        robot.backRightDrive.setTargetPosition(targetPosition);
+
+        // Initialize power and run to position
+        double power = 0.1; // Initial power (start slow)
+        double accelerationRate = 0.02; // Rate of power increase per iteration
+
+        // Set power and run to position
+        robot.frontLeftDrive.setPower(power); // Adjust power as needed
+        robot.frontRightDrive.setPower(-power);
+        robot.backLeftDrive.setPower(-power);
+        robot.backRightDrive.setPower(power);
+
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+        while (opModeIsActive() &&
+                robot.frontLeftDrive.isBusy() &&
+                robot.frontRightDrive.isBusy() &&
+                robot.backLeftDrive.isBusy() &&
+                robot.backRightDrive.isBusy()) {
+            // Gradually increase power for acceleration
+            if (power < maxPower) {
+                power += accelerationRate;
+            }
+            // You can add additional tasks here if needed
+        }
+
+        // Gradually decrease power for deceleration
+        while (power > 0) {
+            power -= accelerationRate;
+            if (power < 0) {
+                power = 0;
+            }
+            robot.frontLeftDrive.setPower(power);
+            robot.frontRightDrive.setPower(-power);
+            robot.backLeftDrive.setPower(-power);
+            robot.backRightDrive.setPower(power);
+        }
+
+        // Stop the robot
+        stopAllMotors();
+
+        // Set the motors back to RUN_USING_ENCODER mode for manual control
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
+
+    public void strafeLeft(double maxPower, int distanceInches) {
+        int targetPosition = (int) (-distanceInches * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
+
+        // Reset encoder values and set target positions
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.backRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        robot.frontLeftDrive.setTargetPosition(targetPosition);
+        robot.frontRightDrive.setTargetPosition(-targetPosition);
+        robot.backLeftDrive.setTargetPosition(-targetPosition);
+        robot.backRightDrive.setTargetPosition(targetPosition);
+
+        // Initialize power and run to position
+        double power = 0.1; // Initial power (start slow)
+        double accelerationRate = 0.02; // Rate of power increase per iteration
+
+        // Set power and run to position
+        robot.frontLeftDrive.setPower(-power); // Adjust power as needed
+        robot.frontRightDrive.setPower(power);
+        robot.backLeftDrive.setPower(power);
+        robot.backRightDrive.setPower(-power);
+
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+        while (opModeIsActive() &&
+                robot.frontLeftDrive.isBusy() &&
+                robot.frontRightDrive.isBusy() &&
+                robot.backLeftDrive.isBusy() &&
+                robot.backRightDrive.isBusy()) {
+            // Gradually increase power for acceleration
+            if (power < maxPower) {
+                power += accelerationRate;
+            }
+            // You can add additional tasks here if needed
+
+        }
+
+        // Gradually decrease power for deceleration
+        while (power > 0) {
+            power -= accelerationRate;
+            if (power < 0) {
+                power = 0;
+            }
+            robot.frontLeftDrive.setPower(-power);
+            robot.frontRightDrive.setPower(power);
+            robot.backLeftDrive.setPower(power);
+            robot.backRightDrive.setPower(-power);
+
+        }
+
+        // Stop the robot
+        stopAllMotors();
+
+        // Set the motors back to RUN_USING_ENCODER mode for manual control
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
     public void rotate(double maxPower, double targetAngle) {
         // Ensure the target angle is within the range of -180 to 180 degrees
         targetAngle = normalizeAngle(targetAngle);
@@ -296,25 +433,37 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         // Calculate the initial heading
         double initialHeading = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
 
-        // Calculate the error (the difference between the target and current heading)
-        double error = targetAngle - initialHeading;
+        // Calculate the target heading directly
+        double targetHeading = initialHeading - targetAngle;
 
-        // Set the power sign based on the direction of rotation
-        int powerSign = (error > 0) ? -1 : 1;
+        // While the current heading is not close to the target heading, continue rotating
+        while (opModeIsActive() && !isCloseEnough(initialHeading, targetHeading)) {
+            // Recalculate the current heading at each iteration
+            initialHeading = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
 
-        // While the error is outside an acceptable threshold, continue rotating
-        while (opModeIsActive() && Math.abs(error) > 1.0) {
-            // Recalculate the error at each iteration
-            error = targetAngle - imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
+            // Calculate the error (difference between current and target headings)
+            double error = targetHeading - initialHeading;
+
+            // Normalize the error to the range -180 to 180 degrees
+            error = normalizeAngle(error);
 
             // Adjust the power based on the error and maxPower
-            double power = powerSign * Math.min(maxPower, Math.abs(error / 30.0));
+            double power = Math.min(maxPower, Math.abs(error / 30.0));
 
-            // Set the motor powers to rotate
-            robot.frontLeftDrive.setPower(-power);
-            robot.frontRightDrive.setPower(power);
-            robot.backLeftDrive.setPower(-power);
-            robot.backRightDrive.setPower(power);
+            // Determine the direction of rotation (clockwise or counter-clockwise)
+            if (error < 0) {
+                // Rotate clockwise
+                robot.frontLeftDrive.setPower(power);
+                robot.frontRightDrive.setPower(-power);
+                robot.backLeftDrive.setPower(power);
+                robot.backRightDrive.setPower(-power);
+            } else {
+                // Rotate counter-clockwise
+                robot.frontLeftDrive.setPower(-power);
+                robot.frontRightDrive.setPower(power);
+                robot.backLeftDrive.setPower(-power);
+                robot.backRightDrive.setPower(power);
+            }
         }
 
         // Stop the motors
@@ -325,6 +474,25 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
+public void openCLaw(){
+       leftClawServo.setPosition(LEFT_CLAW_POSITION_ONE);
+       rightClawServo.setPosition(RIGHT_CLAW_POSITION_ONE);
+}
+    public void closeCLaw(){
+        leftClawServo.setPosition(LEFT_CLAW_POSITION_TWO);
+        rightClawServo.setPosition(RIGHT_CLAW_POSITION_TWO);
+        }
+    // Helper function to check if the current heading is close enough to the target heading
+    private boolean isCloseEnough(double currentHeading, double targetHeading) {
+        // Define a tolerance for how close is considered "close enough"
+        double tolerance = 5.0; // Adjust as needed
+
+        // Calculate the absolute error
+        double error = Math.abs(targetHeading - currentHeading);
+
+        // Check if the error is within the tolerance
+        return error <= tolerance;
     }
 
     // Helper function to normalize angles to the range -180 to 180 degrees
@@ -337,5 +505,6 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         }
         return angle;
     }
+
 
 }
