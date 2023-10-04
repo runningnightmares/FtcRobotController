@@ -72,7 +72,7 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
     private final double DRIVETRAIN_POWER = 0.5;
         private final double DRIVETRAIN_TPI = 45.33;
     private final double DRIVETRAIN_ZERO_POWER = 0.0;
-        private final double ELEVATOR_ARM_POWER = 0.5;
+        private final double ELEVATOR_ARM_POWER = 1;
         private final double ELEVATOR_ARM_ZERO_POWER = 0.0;
     private final double LEFT_CLAW_INIT_POSITION = 0;
     private final double RIGHT_CLAW_INIT_POSITION = 0;
@@ -80,11 +80,16 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
     private final double LEFT_CLAW_POSITION_TWO = 0.45;
     private final double RIGHT_CLAW_POSITION_ONE = 0.0;
     private final double RIGHT_CLAW_POSITION_TWO = 0.45;
-        private final double ELEVATOR_ENCODER_TICKS_PER_INCH = 188.72;
-        private final int targetEncoderTicks = 0;
+    private final int ELEVATOR_POSITION_GROUND = 0;//ground position
+    private final int ELEVATOR_POSITION_LOW = 760;//low position
+    private final int ELEVATOR_POSITION_MID = 1260; //mid position
+    private final int ELEVATOR_POSITION_HIGH = 1570; //high position
+    private final double ELEVATOR_ENCODER_TICKS_PER_INCH = 188.72;
+    private final int targetEncoderTicks = 0;
+    double targetHeading = 0.0;// Set a target heading (e.g., 0 degrees for straight forward)
 
-    // Set a target heading (e.g., 0 degrees for straight forward)
-    double targetHeading = 0.0;
+    // Define a constant for the duration of the autonomous period in seconds
+    private final double AUTONOMOUS_DURATION = 30.0;
 
     public void initHardware(){
             elevatorMotorInit();
@@ -123,9 +128,7 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         rightClawServo.setPosition(RIGHT_CLAW_INIT_POSITION);
     }
         public void elevatorMotorInit(){
-            // Initialize the hardware variables. Note that the strings used here as parameters
-            // to 'get' must correspond to the names assigned during the robot configuration
-            // step (using the FTC Robot Controller app on the phone).
+            // Initialize the hardware variables.
             elevatorArm = hardwareMap.get(DcMotor.class, "liftArm");
             elevatorArm.setDirection(DcMotorSimple.Direction.REVERSE);
             elevatorArm.setPower(ELEVATOR_ARM_POWER);
@@ -135,6 +138,8 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
     @Override
         public void runOpMode(){
 
+        // Initialize an ElapsedTime object to track time
+        ElapsedTime autonomousTimer = new ElapsedTime();
             initHardware();
             runTime.reset();
             // Define and Initialize Motors
@@ -143,18 +148,31 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
             // Send telemetry message to signify robot waiting;
             telemetry.addData(">", "Robot Ready.  Press Play.");    //
             telemetry.update();
-        double initialPower = 0.1; // Start with a low power
-        double targetPower = 0.5; // Your desired power
-        double powerIncrement = 0.05; // Increment in power
 
             // Wait for the game to start (driver presses PLAY)
             waitForStart();
 
             if (isStopRequested()) return;
+
+            //running auto program
+
             closeCLaw();
+            sleep(500);
+            runLiftArmToPosition(100);
+            autonomousDriveStraight(.75,10,false);
+            runLiftArmToPosition(ELEVATOR_POSITION_HIGH);
+            sleep(2000);
+            strafeLeft(0.75,3);
             sleep(1000);
+            openCLaw();
+            sleep(500);
+            strafeRight(0.75, 6);
+
+            runLiftArmToPosition(ELEVATOR_POSITION_GROUND);
+
+        /*
         motorTelemetry();
-        autonomousDriveStraight(.5,5,false);
+
         motorTelemetry();
         rotate(0.3,45);
         autonomousDriveStraight(.5,5,true);
@@ -169,14 +187,12 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         motorTelemetry();
         strafeLeft(0.5 , 10);
         motorTelemetry();
+
+ */
             // run until the end of the match (driver presses STOP)
             while (opModeIsActive()) {
-
-
-
                 stopAllMotors();
             }
-
         }
 
 
@@ -185,16 +201,8 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         elevatorArm.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         elevatorArm.setPower(ELEVATOR_ARM_POWER);
     }
-    public  void resetElevatorArmEncoder(){
-        //stop motor
-        elevatorArm.setPower(ELEVATOR_ARM_ZERO_POWER);
-        //stop and reset the encoder
-        elevatorArm.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        //start the encoder
-        elevatorArm.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-    }
-    public void stopAllMotors(){
 
+    public void stopAllMotors(){
         // Stop motors
         robot.frontLeftDrive.setPower(DRIVETRAIN_ZERO_POWER);
         robot.frontRightDrive.setPower(DRIVETRAIN_ZERO_POWER);
@@ -209,6 +217,26 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         telemetry.addData("BR Position", robot.backRightDrive.getCurrentPosition());
         telemetry.update();
     }
+    public void stopAndResetEncoders(){
+        // Reset encoder values and set target positions
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.backRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+    }
+    public void runToPosition(){
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    public void runUsingEncoders(){
+        // Set the motors back to RUN_USING_ENCODER mode for manual control
+        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
     public void autonomousDriveStraight(double maxPower, int distanceInches, boolean reverse) {
         int targetPosition;
 
@@ -218,12 +246,7 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
             targetPosition = (int) (distanceInches * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
         }
 
-        // Reset encoder values and set target positions
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.backRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
+        stopAndResetEncoders();
         robot.frontLeftDrive.setTargetPosition(targetPosition);
         robot.frontRightDrive.setTargetPosition(targetPosition);
         robot.backLeftDrive.setTargetPosition(targetPosition);
@@ -232,20 +255,15 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         double power = 0.1; // Initial power (start slow)
         double accelerationRate = 0.02; // Rate of power increase per iteration
 
-
         // Set power and run to position
         robot.frontLeftDrive.setPower(power); // Adjust power as needed
         robot.frontRightDrive.setPower(power);
         robot.backLeftDrive.setPower(power);
         robot.backRightDrive.setPower(power);
 
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        runToPosition();
 
         double initialHeading = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
-
 
         while (opModeIsActive() &&
                 robot.frontLeftDrive.isBusy() &&
@@ -283,24 +301,13 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
             robot.backRightDrive.setPower(power);
         }
         // Stop the robot
-        robot.frontLeftDrive.setPower(0.0);
-        robot.frontRightDrive.setPower(0.0);
-        robot.backLeftDrive.setPower(0.0);
-        robot.backRightDrive.setPower(0.0);
-        // Set the motors back to RUN_USING_ENCODER mode for manual control
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        stopAllMotors();
+
     }
     public void strafeRight(double maxPower, int distanceInches) {
         int targetPosition = (int) (distanceInches * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
 
-        // Reset encoder values and set target positions
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.backRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        stopAndResetEncoders();
 
         robot.frontLeftDrive.setTargetPosition(targetPosition);
         robot.frontRightDrive.setTargetPosition(-targetPosition);
@@ -317,11 +324,7 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         robot.backLeftDrive.setPower(-power);
         robot.backRightDrive.setPower(power);
 
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-
+        runToPosition();
         while (opModeIsActive() &&
                 robot.frontLeftDrive.isBusy() &&
                 robot.frontRightDrive.isBusy() &&
@@ -349,21 +352,13 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         // Stop the robot
         stopAllMotors();
 
-        // Set the motors back to RUN_USING_ENCODER mode for manual control
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        runUsingEncoders();
     }
 
     public void strafeLeft(double maxPower, int distanceInches) {
         int targetPosition = (int) (-distanceInches * COUNTS_PER_REV / (Math.PI * WHEEL_DIAMETER));
 
-        // Reset encoder values and set target positions
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        robot.backRightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        stopAndResetEncoders();
 
         robot.frontLeftDrive.setTargetPosition(targetPosition);
         robot.frontRightDrive.setTargetPosition(-targetPosition);
@@ -380,10 +375,7 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         robot.backLeftDrive.setPower(power);
         robot.backRightDrive.setPower(-power);
 
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        runToPosition();
 
         while (opModeIsActive() &&
                 robot.frontLeftDrive.isBusy() &&
@@ -414,21 +406,13 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         // Stop the robot
         stopAllMotors();
 
-        // Set the motors back to RUN_USING_ENCODER mode for manual control
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        runUsingEncoders();
     }
     public void rotate(double maxPower, double targetAngle) {
         // Ensure the target angle is within the range of -180 to 180 degrees
         targetAngle = normalizeAngle(targetAngle);
 
-        // Set the motors to run using encoders
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+       runUsingEncoders();
 
         // Calculate the initial heading
         double initialHeading = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle;
@@ -469,11 +453,7 @@ import org.firstinspires.ftc.teamcode.teleop.MecanumDriveHardware;
         // Stop the motors
         stopAllMotors();
 
-        // Set the motors back to RUN_USING_ENCODER mode for manual control
-        robot.frontLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.frontRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backLeftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.backRightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+       runUsingEncoders();
     }
 public void openCLaw(){
        leftClawServo.setPosition(LEFT_CLAW_POSITION_ONE);
@@ -508,3 +488,5 @@ public void openCLaw(){
 
 
 }
+
+
